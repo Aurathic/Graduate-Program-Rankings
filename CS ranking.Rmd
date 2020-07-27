@@ -1,0 +1,64 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+Minimal reproducible example: ranking of Computer Science programs by placement matrix. 
+
+[Dataset from http://cs.brown.edu/people/apapouts/faculty_dataset.html].
+
+
+```{r}
+# Some old, old R code.
+
+source("functions.R")
+
+# Nowadays I only do it like this.
+
+library(tidyverse)
+data = read_csv("professors.csv")
+
+# Rename to the columns I used in 2005.
+
+combined = data %>% select(Doctorate, University, JoinYear, Bachelors) %>%
+  mutate(Year = JoinYear,
+         DegreeSchool = Doctorate,
+         School = University) %>%
+  mutate(DegreeSchool = DegreeSchool %>% str_replace(" - USA", ""))
+
+# Build a symmetrical matrix
+
+appts = make.appointments(combined, max.year = 2020, min.year = 2010)
+
+# q is the transition likelihood. If it's 0, a very strong weight will be placed
+# on placement at top schools; if it's 1, all schools will be treated equally.
+
+(pagerank(appts, q = .1) * 100) %>% as_tibble(rownames = "school") %>% arrange(-V1)
+
+```
+# Bootstrapping
+
+A good way to get error bars would be to use bootstrap sampling. We didn't do this in the paper, but it gives a decent idea of the variability in this data.
+
+```{r}
+bootstrap = function() {
+  sample = combined %>% ungroup %>% slice_sample(prop = 1, replace = TRUE)
+  appts = make.appointments(sample, max.year = 2020, min.year = 2005)
+  
+  # q is the transition likelihood. If it's 0, a very strong weight will be placed
+  # on placement at top schools; if it's 1, all schools will be treated equally.
+  
+  (pagerank(appts, q = .1) * 100) %>% as_tibble(rownames = "school") %>%
+    mutate(score = V1)
+}
+
+samples = rerun(100, bootstrap())
+
+samples %>% bind_rows() %>% group_by(school) %>% mutate(mean = mean(score), sd = sd(score)) %>%
+  filter(mean > 1) %>%
+  ggplot() + aes(x = reorder(school,mean), ymin = mean-sd, ymax = mean + sd, y = score) + coord_flip() + geom_boxplot() + scale_y_log10()
+
+```
