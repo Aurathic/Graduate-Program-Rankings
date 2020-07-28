@@ -94,6 +94,8 @@ pagerank <- function(Appointments, q=.1, weighting = "schools",
     oldR <- R
     R    <- (matrix1 + (((1-q) * Appointments) %*% R))
   }
+  # Re-imagine as probabilities.
+  R = R/sum(R)
   # n = n + 1; oldR <- R; R<-(matrix1 + (((1-q) * Appointments) %*% R));cbind(rownames(as.data.frame(R))[orderR)],sort(R))
   R
 }
